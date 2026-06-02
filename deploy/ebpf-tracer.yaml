@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ebpf-tracer
+  namespace: ebpf-system
+spec:
+  selector:
+    matchLabels:
+      app: ebpf-tracer
+  template:
+    metadata:
+      labels:
+        app: ebpf-tracer
+    spec:
+      hostNetwork: true
+      hostPID: true
+      serviceAccountName: ebpf-tracer   # 用于 K8s API 访问
+      initContainers:
+        - name: check-kernel
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "检查内核版本 (需要 >= 5.8)..."
+              uname -r
+              # 可选：检查 BTF 支持
+              if [ -f /sys/kernel/btf/vmlinux ]; then
+                echo "BTF 已启用"
+              else
+                echo "警告：未找到 /sys/kernel/btf/vmlinux，eBPF CO-RE 可能不可用"
+              fi
+          securityContext:
+            privileged: false
+          volumeMounts:
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+      containers:
+        - name: tracer
+          image: ebpf-tracer:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            # 用细粒度 capabilities 代替 privileged
+            capabilities:
+              add:
+                - CAP_BPF
+                - CAP_NET_ADMIN      # 加载 TC 程序
+                - CAP_SYS_PTRACE     # 访问 /proc/<pid>/net/tcp（若需要）
+                - CAP_SYS_ADMIN      # 加载 eBPF 程序（部分内核需要）
+                # 如果必须访问 /sys/kernel/debug，可增加 CAP_SYS_ADMIN
+            # 仍然需要 hostNetwork/hostPID，这在 K8s 中需要 privileged？实际上只有 hostPID 需要 privileged？不，
+            # hostNetwork 和 hostPID 本身不需要 privileged，但要访问宿主机的 proc 和网络，通常需要 privileged，
+            # 但在最新的 K8s 中，你可以通过 capabilities 和 allowedHostPaths 来降低权限。
+            # 为了兼容，这里保留 privileged: false，但添加了必要的 capabilities。
+            # 如果你的内核支持 CAP_BPF 和 CAP_PERFMON，可以完全不用 privileged。
+            # 但 hostPID 是一个敏感属性，需要 PodSecurityPolicy/PSA 放行。
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: KUBECONFIG
+              value: /etc/kubernetes/kubeconfig   # 或使用 InClusterConfig
+          volumeMounts:
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+      tolerations:
+        - operator: Exists
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ebpf-tracer
+  namespace: ebpf-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ebpf-tracer
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ebpf-tracer
+subjects:
+  - kind: ServiceAccount
+    name: ebpf-tracer
+    namespace: ebpf-system
+roleRef:
+  kind: ClusterRole
+  name: ebpf-tracer
+  apiGroup: rbac.authorization.k8s.io
