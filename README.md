@@ -9,7 +9,7 @@
 
 **eBPF-AutoHeal** is an eBPF-based zero-instrumentation microservice observability and auto-healing platform. It captures all TCP communication at the kernel level without any code modification, builds real-time call topology, pinpoints root causes using **adaptive thresholds, multi-dimensional anomaly scoring, and reverse random walk (PageRank)**. It then triggers kernel-level circuit breaking, Kubernetes Pod isolation/restart, collects CPU/memory flame graphs, goroutine/thread dumps, and packet captures at the failure scene, and finally sends alerts via Feishu/DingTalk webhooks — completing the full SRE closed-loop: **detect → diagnose → heal → preserve → notify**.
 
-> 🇨🇳 中文文档：[项目日志](project-log.md) ｜ [演示与测试指南](testing.md) ｜ [项目简介](PROJECT_INTRO.md) ｜ [面试学习指南](STUDY_GUIDE.md) ｜ [面试问答准备](qs.md)
+> 🇨🇳 中文文档：[项目日志](project-log.md) ｜ [演示与测试指南](testing.md) ｜ [项目简介](PROJECT_INTRO.md) 
 
 ## Core Features
 - **Zero-instrumentation capture**: Uses eBPF kprobe on `tcp_sendmsg` to automatically extract source/dest IP, port, latency (ns), process name (IPv4/IPv6 dual-stack)
@@ -172,10 +172,7 @@ ebpf-autoheal/
 ├── pprof-demo.go                # Local pprof test service
 ├── README.md
 ├── PROJECT_INTRO.md             # 项目简介（技术栈 + 核心功能）
-├── STUDY_GUIDE.md               # 面试学习指南（算法详解 + 面试问答）
 ├── project-log.md               # 详细项目开发日志（中文）
-├── qs.md                        # 面试问答准备（30 题）
-├── 1.md                         # 面试优化建议
 ├── weilai.md                    # 未来扩展方向
 └── testing.md                   # 演示与测试指南（中文）
 ```
@@ -212,5 +209,5 @@ This project is licensed under the [GPL v3.0](LICENSE) license.
 ---
 
 <p align="center">
-  Made with 🐝 by [Your Name] · 2026
+  Made with 🐝 by [沈乐琰] · 2026
 </p>
